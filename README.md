@@ -42,6 +42,9 @@ Jump into a new era of navigation with Navigator for a truly declarative navigat
 
 ## Example
 ```
+import { View, Button } from "react-native";
+import { Navigator, useNavigator } from "declarative_navigator";
+
 export default function App() {
   return (
     // chain of navigation could be declared statically here outside of compontns,
