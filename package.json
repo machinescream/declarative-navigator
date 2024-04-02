@@ -1,0 +1,32 @@
+{
+  "name": "declarative-navigator",
+  "version": "1.0.0",
+  "description": "Declarative navigation with static analysis safety",
+  "main": "index.tsx",
+  "scripts": {
+    "test": "test"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/machinescream/navigator.git"
+  },
+  "keywords": [
+    "navigation",
+    "navigator",
+    "safety",
+    "declarative"
+  ],
+  "author": "machinescream",
+  "license": "BSD-2-Clause",
+  "bugs": {
+    "url": "https://github.com/machinescream/navigator/issues"
+  },
+  "homepage": "https://github.com/machinescream/navigator#readme",
+  "dependencies": {
+    "@types/react": "~18.2.45",
+    "@react-navigation/native": "6.1.17",
+    "@react-navigation/native-stack": "6.9.26",
+    "react": "18.2.0",
+    "react-native": "0.73.2"
+  }
+}
