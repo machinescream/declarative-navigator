@@ -39,3 +39,74 @@ Just define your entire navigation path outside your components in a clear and s
 Web support is in the works to ensure consistent and smooth navigation experiences across all platforms.
 
 Jump into a new era of navigation with Navigator for a truly declarative navigation experience in your React Native projects!
+
+## Example
+```
+export default function App() {
+  return (
+    // chain of navigation could be declared statically here outside of compontns,
+    // this approach improves navigation safety, straitforward navigation declaration
+    <Navigator>
+      <First
+        onNavigate={(navigator) => {
+          navigator.push(
+            <Second
+              onNavigate={(navigator) => {
+                navigator.push(<Third />);
+              }}
+            />,
+          );
+        }}
+      />
+    </Navigator>
+  );
+}
+
+function First({
+  onNavigate,
+}: {
+  onNavigate: (navigator: NavigatorActions) => void;
+}) {
+  const navigator = useNavigator();
+  return (
+    <View style={{ backgroundColor: "red", flex: 1, alignItems: "center" }}>
+      <Button
+        title="go to second"
+        onPress={() => {
+          //also could be used without passed callback, but strongly recomended
+          //to declare navigation outside of current component
+          onNavigate(navigator);
+        }}
+      ></Button>
+    </View>
+  );
+}
+
+function Second({
+  onNavigate,
+}: {
+  onNavigate: (navigator: NavigatorActions) => void;
+}) {
+  const navigator = useNavigator();
+  return (
+    <View style={{ backgroundColor: "blue", flex: 1, alignItems: "center" }}>
+      <Button
+        title="go to third"
+        onPress={() => {
+          //also could be used without passed callback, but strongly recomended
+          //to declare navigation outside of current component
+          onNavigate(navigator);
+        }}
+      ></Button>
+    </View>
+  );
+}
+
+function Third() {
+  return (
+    <View
+      style={{ backgroundColor: "green", flex: 1, alignItems: "center" }}
+    ></View>
+  );
+}
+```
