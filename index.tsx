@@ -2,7 +2,7 @@ import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import { useNavigation, StackActions } from "@react-navigation/native";
 import React, { ReactNode } from "react";
 import { NavigationContainer } from "@react-navigation/native";
-import { Button, LogBox, View } from "react-native";
+import { LogBox } from "react-native";
 
 const navigationPage = "NavigationPage";
 

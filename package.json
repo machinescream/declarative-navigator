@@ -1,6 +1,6 @@
 {
   "name": "declarative-navigator",
-  "version": "1.0.0",
+  "version": "1.0.3",
   "description": "Declarative navigation with static analysis safety",
   "main": "index.tsx",
   "scripts": {
@@ -8,7 +8,7 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/machinescream/navigator.git"
+    "url": "git+https://github.com/machinescream/declarative-navigator"
   },
   "keywords": [
     "navigation",
