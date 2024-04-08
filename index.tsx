@@ -1,15 +1,15 @@
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import { useNavigation, StackActions } from "@react-navigation/native";
-import React, { ReactNode } from "react";
+import React, { ReactNode, useEffect } from "react";
 import { NavigationContainer } from "@react-navigation/native";
 import { LogBox } from "react-native";
 
 const navigationPage = "NavigationPage";
 
 export interface NavigatorActions {
-  push: (children: ReactNode) => void;
-  pop: () => void;
-  replace: (children: ReactNode) => void;
+  push: <T>(children: ReactNode) => Promise<T | undefined>;
+  pop: <T>(result?: T) => void;
+  replace: <T>(children: ReactNode) => Promise<T | undefined>;
 }
 
 interface NavigatorRouteParams {
@@ -32,28 +32,65 @@ export const Navigator = ({
             headerShown,
           }}
           name={navigationPage}
-          children={({ route }) =>
-            (route.params as NavigatorRouteParams)?.view ?? children
-          }
+          children={({ route }) => {
+            const params = route.params as NavigatorRouteParams;
+            //@ts-ignore
+            return (
+              <NavigatorPage completer={params?.completer}>
+                {params?.view ?? children}
+              </NavigatorPage>
+            );
+          }}
         />
       </Stack.Navigator>
     </NavigationContainer>
   );
 };
 
+const NavigatorPage = ({
+  children,
+  completer,
+}: {
+  children: ReactNode;
+  completer?: () => void;
+}) => {
+  useEffect(() => {
+    return completer;
+  }, []);
+  return <>{children}</>;
+};
+
 // add callback to end of route or make in async!
 export function useNavigator(): NavigatorActions {
   const navigation = useNavigation();
 
-  const push = (children: ReactNode) =>
-    navigation.dispatch(StackActions.push(navigationPage, { view: children }));
+  const push = async <T,>(children: ReactNode) => {
+    return new Promise<T | undefined>((resolve, _) => {
+      navigation.dispatch(
+        StackActions.push(navigationPage, {
+          view: children,
+          completer: resolve,
+        }),
+      );
+    });
+  };
 
-  const pop = () => navigation.dispatch(StackActions.pop());
+  const replace = async <T,>(children: ReactNode) => {
+    return new Promise<T | undefined>((resolve, _) => {
+      navigation.dispatch(
+        StackActions.replace(navigationPage, {
+          view: children,
+          completer: resolve,
+        }),
+      );
+    });
+  };
 
-  const replace = (children: ReactNode) =>
-    navigation.dispatch(
-      StackActions.replace(navigationPage, { view: children }),
-    );
+  const pop = <T,>(result?: T): void => {
+    //@ts-ignore
+    navigation.getState().routes.at(-1).params.completer(result);
+    navigation.dispatch(StackActions.pop());
+  };
 
   return {
     push,
