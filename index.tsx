@@ -13,7 +13,8 @@ export interface NavigatorActions {
 }
 
 interface NavigatorRouteParams {
-  view: ReactNode;
+  view?: ReactNode;
+  completer?: () => void;
 }
 
 export const Navigator = ({
@@ -34,7 +35,6 @@ export const Navigator = ({
           name={navigationPage}
           children={({ route }) => {
             const params = route.params as NavigatorRouteParams;
-            //@ts-ignore
             return (
               <NavigatorPage completer={params?.completer}>
                 {params?.view ?? children}
@@ -51,7 +51,7 @@ const NavigatorPage = ({
   children,
   completer,
 }: {
-  children: ReactNode;
+  children?: ReactNode;
   completer?: () => void;
 }) => {
   useEffect(() => {
@@ -60,7 +60,6 @@ const NavigatorPage = ({
   return <>{children}</>;
 };
 
-// add callback to end of route or make in async!
 export function useNavigator(): NavigatorActions {
   const navigation = useNavigation();
 
