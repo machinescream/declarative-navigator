@@ -1,6 +1,17 @@
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
-import { useNavigation, StackActions } from "@react-navigation/native";
-import React, { ReactNode, useEffect } from "react";
+import {
+  StackActions,
+  useNavigationContainerRef,
+} from "@react-navigation/native";
+import React, {
+  FC,
+  ReactNode,
+  createContext,
+  useContext,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+} from "react";
 import { NavigationContainer } from "@react-navigation/native";
 import { LogBox } from "react-native";
 
@@ -17,55 +28,61 @@ interface NavigatorRouteParams {
   completer?: () => void;
 }
 
-export const Navigator = ({
-  children,
-  headerShown,
-}: {
+interface NavigatorProps {
   children: ReactNode;
   headerShown?: boolean;
-}) => {
-  const Stack = createNativeStackNavigator();
-  return (
-    <NavigationContainer independent={true}>
-      <Stack.Navigator initialRouteName={navigationPage}>
-        <Stack.Screen
-          options={{
-            headerShown,
-          }}
-          name={navigationPage}
-          children={({ route }) => {
-            const params = route.params as NavigatorRouteParams;
-            return (
-              <NavigatorPage completer={params?.completer}>
-                {params?.view ?? children}
-              </NavigatorPage>
-            );
-          }}
-        />
-      </Stack.Navigator>
-    </NavigationContainer>
-  );
-};
+}
 
-const NavigatorPage = ({
-  children,
-  completer,
-}: {
-  children?: ReactNode;
-  completer?: () => void;
-}) => {
-  useEffect(() => {
-    return completer;
+const NavigatorContext = createContext<NavigatorActions | undefined>(undefined);
+
+let navigatorIndex = 0;
+
+export const Navigator: FC<NavigatorProps> = ({ children, headerShown }) => {
+  navigatorIndex++;
+  const navigatorIndexRef = useRef(navigatorIndex);
+  const navigatorRef = useNavigationContainerRef();
+  const index = useRef(0);
+
+  useLayoutEffect(() => {
+    // window.history.replaceState({ index: index.current }, "");
+    const backHandler = (event: PopStateEvent) => {
+      const activeNavigator = event.state?.activeNavigator ?? -1;
+      if (activeNavigator !== navigatorIndexRef.current) return;
+      const newIndex = event.state?.index;
+      const forward = newIndex > index.current;
+      if (forward) {
+        console.log("implement forward, jdk");
+        // navigatorRef.current?.dispatch(
+        //   StackActions.push(navigationPage, {
+        //     view: history.current[newIndex],
+        //   }),
+        // );
+      } else {
+        if (navigatorRef.canGoBack()) navigatorRef.goBack();
+      }
+      index.current = newIndex || 0;
+    };
+    window.addEventListener("popstate", backHandler);
+    return () => {
+      window.removeEventListener("popstate", backHandler);
+    };
   }, []);
-  return <>{children}</>;
-};
 
-export function useNavigator(): NavigatorActions {
-  const navigation = useNavigation();
-
-  const push = async <T,>(children: ReactNode) => {
+  const push = async <T,>(children: ReactNode): Promise<T | undefined> => {
+    const newIndex = index.current + 1;
+    window.history.replaceState(
+      { index: index.current, activeNavigator: navigatorIndexRef.current },
+      "",
+      "",
+    );
+    window.history.pushState(
+      { index: newIndex, activeNavigator: navigatorIndexRef.current },
+      "",
+      "",
+    );
+    index.current = newIndex;
     return new Promise<T | undefined>((resolve, _) => {
-      navigation.dispatch(
+      navigatorRef.dispatch(
         StackActions.push(navigationPage, {
           view: children,
           completer: resolve,
@@ -74,9 +91,14 @@ export function useNavigator(): NavigatorActions {
     });
   };
 
-  const replace = async <T,>(children: ReactNode) => {
+  const replace = async <T,>(children: ReactNode): Promise<T | undefined> => {
+    window.history.replaceState(
+      { index: index.current, activeNavigator: navigatorIndexRef.current },
+      "",
+      "",
+    );
     return new Promise<T | undefined>((resolve, _) => {
-      navigation.dispatch(
+      navigatorRef.dispatch(
         StackActions.replace(navigationPage, {
           view: children,
           completer: resolve,
@@ -85,17 +107,57 @@ export function useNavigator(): NavigatorActions {
     });
   };
 
-  const pop = <T,>(result?: T): void => {
-    //@ts-ignore
-    navigation.getState().routes.at(-1).params.completer(result);
-    navigation.dispatch(StackActions.pop());
+  const pop = () => {
+    window.history.back();
+    // navigation.goBack();
   };
 
-  return {
-    push,
-    pop,
-    replace,
-  };
+  const Stack = createNativeStackNavigator();
+  return (
+    <NavigationContainer ref={navigatorRef} independent={true}>
+      <NavigatorContext.Provider
+        value={{
+          push,
+          replace,
+          pop,
+        }}
+      >
+        <Stack.Navigator initialRouteName={navigationPage}>
+          <Stack.Screen
+            options={{
+              headerShown,
+            }}
+            name={navigationPage}
+            children={({ route }) => {
+              const params = route.params as NavigatorRouteParams;
+              return (
+                <NavigatorPage completer={params?.completer}>
+                  {params?.view ?? children}
+                </NavigatorPage>
+              );
+            }}
+          />
+        </Stack.Navigator>
+      </NavigatorContext.Provider>
+    </NavigationContainer>
+  );
+};
+
+const NavigatorPage = ({
+  children,
+  completer,
+}: {
+  children: ReactNode;
+  completer?: () => void;
+}) => {
+  useEffect(() => {
+    return completer;
+  }, []);
+  return <>{children}</>;
+};
+
+export function useNavigator(): NavigatorActions | undefined {
+  return useContext(NavigatorContext);
 }
 
 //warning ignores

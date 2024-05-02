@@ -1,3 +1,3 @@
 # Changelog
 
-- **2.0.0** - Web support
+- **2.0.1** - Web support
