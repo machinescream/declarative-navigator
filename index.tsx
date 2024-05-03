@@ -1,5 +1,6 @@
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import {
+  NavigationContainerRefWithCurrent,
   StackActions,
   useNavigationContainerRef,
 } from "@react-navigation/native";
@@ -13,7 +14,7 @@ import React, {
   useRef,
 } from "react";
 import { NavigationContainer } from "@react-navigation/native";
-import { LogBox } from "react-native";
+import { LogBox, Platform } from "react-native";
 
 const navigationPage = "NavigationPage";
 
@@ -36,51 +37,70 @@ interface NavigatorProps {
 const NavigatorContext = createContext<NavigatorActions | undefined>(undefined);
 
 let navigatorIndex = 0;
+let pageIndex = 0;
+
+let navigatorActivity = new Array<number>();
+
+let navigatorRegistery = new Map<
+  number,
+  NavigationContainerRefWithCurrent<{}>
+>();
 
 export const Navigator: FC<NavigatorProps> = ({ children, headerShown }) => {
   navigatorIndex++;
   const navigatorIndexRef = useRef(navigatorIndex);
   const navigatorRef = useNavigationContainerRef();
-  const index = useRef(0);
+  navigatorRegistery.set(navigatorIndex, navigatorRef);
+  const routeCount = useRef(0);
 
-  useLayoutEffect(() => {
-    // window.history.replaceState({ index: index.current }, "");
-    const backHandler = (event: PopStateEvent) => {
-      const activeNavigator = event.state?.activeNavigator ?? -1;
-      if (activeNavigator !== navigatorIndexRef.current) return;
-      const newIndex = event.state?.index;
-      const forward = newIndex > index.current;
-      if (forward) {
-        console.log("implement forward, jdk");
-        // navigatorRef.current?.dispatch(
-        //   StackActions.push(navigationPage, {
-        //     view: history.current[newIndex],
-        //   }),
-        // );
-      } else {
-        if (navigatorRef.canGoBack()) navigatorRef.goBack();
-      }
-      index.current = newIndex || 0;
-    };
-    window.addEventListener("popstate", backHandler);
+  if (navigatorIndex == 1 && Platform.OS == "web") {
+    useLayoutEffect(() => {
+      const backHandler = (event: PopStateEvent | undefined) => {
+        const newIndex = event?.state?.index;
+        const forward = newIndex > pageIndex;
+        pageIndex = newIndex || 0;
+        const targetNavigator = navigatorRegistery.get(
+          navigatorActivity.at(-1)!,
+        );
+        if (targetNavigator === undefined) return;
+        if (forward) {
+          navigatorActivity.push(-1);
+          window.history.back();
+          executor.execute(() => {
+            navigatorActivity.pop();
+          });
+          return;
+        }
+        executor.execute(() => {
+          if (targetNavigator.canGoBack()) {
+            // @ts-ignore
+            targetNavigator.getState()?.routes?.at(-1)?.params?.completer(null);
+            targetNavigator.dispatch(StackActions.pop());
+            navigatorActivity.pop();
+          }
+        });
+      };
+      window.addEventListener("popstate", backHandler);
+      return () => window.removeEventListener("popstate", backHandler);
+    }, []);
+  }
+
+  useEffect(() => {
     return () => {
-      window.removeEventListener("popstate", backHandler);
+      navigatorActivity.push(-1);
+      for (let i = 0; i < routeCount.current; i++) {
+        executor.execute(() => window.history.back());
+      }
+      executor.execute(() => navigatorActivity.pop());
     };
   }, []);
 
   const push = async <T,>(children: ReactNode): Promise<T | undefined> => {
-    const newIndex = index.current + 1;
-    window.history.replaceState(
-      { index: index.current, activeNavigator: navigatorIndexRef.current },
-      "",
-      "",
-    );
-    window.history.pushState(
-      { index: newIndex, activeNavigator: navigatorIndexRef.current },
-      "",
-      "",
-    );
-    index.current = newIndex;
+    routeCount.current++;
+    navigatorActivity.push(navigatorIndexRef.current);
+    const newIndex = pageIndex + 1;
+    window.history.pushState({ index: newIndex }, "");
+    pageIndex = newIndex;
     return new Promise<T | undefined>((resolve, _) => {
       navigatorRef.dispatch(
         StackActions.push(navigationPage, {
@@ -92,11 +112,7 @@ export const Navigator: FC<NavigatorProps> = ({ children, headerShown }) => {
   };
 
   const replace = async <T,>(children: ReactNode): Promise<T | undefined> => {
-    window.history.replaceState(
-      { index: index.current, activeNavigator: navigatorIndexRef.current },
-      "",
-      "",
-    );
+    navigatorActivity.push(navigatorIndexRef.current);
     return new Promise<T | undefined>((resolve, _) => {
       navigatorRef.dispatch(
         StackActions.replace(navigationPage, {
@@ -107,9 +123,18 @@ export const Navigator: FC<NavigatorProps> = ({ children, headerShown }) => {
     });
   };
 
-  const pop = () => {
-    window.history.back();
-    // navigation.goBack();
+  const pop = <T,>(result?: T): void => {
+    routeCount.current--;
+    navigatorActivity.push(navigatorIndexRef.current);
+    // @ts-ignore
+    navigatorRef.getState().routes.at(-1).params.completer(result);
+    if (Platform.OS == "web") {
+      executor.execute(() => {
+        window.history.back();
+      });
+      return;
+    }
+    navigatorRef.dispatch(StackActions.pop());
   };
 
   const Stack = createNativeStackNavigator();
@@ -157,7 +182,11 @@ const NavigatorPage = ({
 };
 
 export function useNavigator(): NavigatorActions | undefined {
-  return useContext(NavigatorContext);
+  try {
+    return useContext(NavigatorContext);
+  } catch {
+    return undefined;
+  }
 }
 
 //warning ignores
@@ -177,3 +206,25 @@ console.warn = (...args: (string | string[])[]) => {
   }
   originalConsoleWarn.apply(console, args);
 };
+
+class QueueExecute {
+  private q = new Array<() => void>();
+  private busy = false;
+  constructor(private timeout: number) {}
+
+  public execute(func: () => void) {
+    if (this.busy) {
+      this.q.push(func);
+      return;
+    }
+    this.busy = true;
+    setTimeout(() => {
+      this.busy = false;
+      func();
+      if (this.q.length > 0) {
+        this.execute(this.q.pop()!);
+      }
+    }, this.timeout);
+  }
+}
+const executor = new QueueExecute(100);
