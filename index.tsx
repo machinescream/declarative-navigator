@@ -35,6 +35,7 @@ const NavigatorContext = createContext<NavigatorActions | undefined>(undefined);
 
 export const Navigator: FC<NavigatorProps> = ({ children, headerShown }) => {
   const navigatorRef = useNavigationContainerRef();
+  const parentNavigator = useNavigator();
 
   const push = async <T,>(children: ReactNode): Promise<T | undefined> => {
     return new Promise<T | undefined>((resolve, _) => {
@@ -59,6 +60,12 @@ export const Navigator: FC<NavigatorProps> = ({ children, headerShown }) => {
   };
 
   const pop = <T,>(result?: T): void => {
+    if (!navigatorRef.canGoBack()) {
+      if (parentNavigator == null)
+        throw Error("cant go back, because no navigator above");
+      parentNavigator.pop(result);
+      return;
+    }
     // @ts-ignore
     navigatorRef.getState().routes.at(-1).params.completer(result);
     navigatorRef.dispatch(StackActions.pop());
@@ -78,6 +85,7 @@ export const Navigator: FC<NavigatorProps> = ({ children, headerShown }) => {
           <Stack.Screen
             options={{
               headerShown,
+              
             }}
             name={navigationPage}
             children={({ route }) => {
@@ -106,13 +114,11 @@ const NavigatorPage = ({
   return <>{children}</>;
 };
 
-export function useNavigator(): NavigatorActions {
+export function useNavigator(): NavigatorActions | null {
   try {
     return useContext(NavigatorContext)!;
   } catch {
-    throw Error(
-      "no parent navigator, make sure you wrapped your component into Navigator",
-    );
+    return null;
   }
 }
 
@@ -122,7 +128,8 @@ const nestedError =
 const nonSerializable =
   "Non-serializable values were found in the navigation state. Check:";
 
-LogBox.ignoreLogs([nestedError, nonSerializable]);
+//may cause errors...
+// LogBox.ignoreLogs([nestedError, nonSerializable]);
 
 const originalConsoleWarn = console.warn;
 console.warn = (...args: (string | string[])[]) => {
