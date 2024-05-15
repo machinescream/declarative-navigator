@@ -12,6 +12,7 @@ import React, {
 } from "react";
 import { NavigationContainer } from "@react-navigation/native";
 import { LogBox, Platform } from "react-native";
+import { HeaderBackButton } from "@react-navigation/elements";
 
 const navigationPage = "NavigationPage";
 
@@ -59,6 +60,8 @@ export const Navigator: FC<NavigatorProps> = ({ children, headerShown }) => {
     });
   };
 
+  const canGoBack = navigatorRef.canGoBack() || parentNavigator !== null;
+
   const pop = <T,>(result?: T): void => {
     if (!navigatorRef.canGoBack()) {
       if (parentNavigator == null)
@@ -85,7 +88,9 @@ export const Navigator: FC<NavigatorProps> = ({ children, headerShown }) => {
           <Stack.Screen
             options={{
               headerShown,
-              
+              headerLeft: canGoBack
+                ? () => <HeaderBackButton onPress={pop} />
+                : undefined,
             }}
             name={navigationPage}
             children={({ route }) => {
