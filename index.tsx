@@ -1,5 +1,6 @@
-import { createNativeStackNavigator } from "@react-navigation/native-stack";
+import { NativeStackNavigationOptions, createNativeStackNavigator } from "@react-navigation/native-stack";
 import {
+  NavigationContainer,
   StackActions,
   useNavigationContainerRef,
 } from "@react-navigation/native";
@@ -10,9 +11,7 @@ import React, {
   useContext,
   useEffect,
 } from "react";
-import { NavigationContainer } from "@react-navigation/native";
-import { LogBox, Platform } from "react-native";
-import { HeaderBackButton } from "@react-navigation/elements";
+import { LogBox, } from "react-native";
 
 const navigationPage = "NavigationPage";
 
@@ -23,26 +22,25 @@ export interface NavigatorActions {
 }
 
 interface NavigatorRouteParams {
-  view?: ReactNode;
+  children?: ReactNode;
   completer?: () => void;
 }
 
 interface NavigatorProps {
   children: ReactNode;
-  headerShown?: boolean;
+  options?: NativeStackNavigationOptions;
 }
 
 const NavigatorContext = createContext<NavigatorActions | undefined>(undefined);
 
-export const Navigator: FC<NavigatorProps> = ({ children, headerShown }) => {
-  const navigatorRef = useNavigationContainerRef();
-  const parentNavigator = useNavigator();
+export const Navigator: FC<NavigatorProps> = ({ children, options }) => {
+  const ref = useNavigationContainerRef();
 
   const push = async <T,>(children: ReactNode): Promise<T | undefined> => {
     return new Promise<T | undefined>((resolve, _) => {
-      navigatorRef.dispatch(
+      ref.dispatch(
         StackActions.push(navigationPage, {
-          view: children,
+          children: children,
           completer: resolve,
         }),
       );
@@ -51,80 +49,53 @@ export const Navigator: FC<NavigatorProps> = ({ children, headerShown }) => {
 
   const replace = async <T,>(children: ReactNode): Promise<T | undefined> => {
     return new Promise<T | undefined>((resolve, _) => {
-      navigatorRef.dispatch(
+      ref.dispatch(
         StackActions.replace(navigationPage, {
-          view: children,
+          children: children,
           completer: resolve,
         }),
       );
     });
   };
 
-  const canGoBack = navigatorRef.canGoBack() || parentNavigator !== null;
-
   const pop = <T,>(result?: T): void => {
-    if (!navigatorRef.canGoBack()) {
-      if (parentNavigator == null)
-        throw Error("cant go back, because no navigator above");
-      parentNavigator.pop(result);
-      return;
-    }
-    // @ts-ignore
-    navigatorRef.getState().routes.at(-1).params.completer(result);
-    navigatorRef.dispatch(StackActions.pop());
+    //@ts-ignore
+    ref.getState()?.routes?.at(-1)?.params?.completer(result);
+    ref.dispatch(StackActions.pop());
   };
 
   const Stack = createNativeStackNavigator();
   return (
-    <NavigationContainer ref={navigatorRef} independent={true}>
-      <NavigatorContext.Provider
-        value={{
-          push,
-          replace,
-          pop,
-        }}
-      >
-        <Stack.Navigator initialRouteName={navigationPage}>
+    <NavigatorContext.Provider value={{ push, replace, pop }}>
+      <NavigationContainer independent={true} ref={ref}>
+        <Stack.Navigator screenOptions={options} initialRouteName={navigationPage}>
           <Stack.Screen
-            options={{
-              headerShown,
-              headerLeft: canGoBack
-                ? () => <HeaderBackButton onPress={pop} />
-                : undefined,
-            }}
             name={navigationPage}
             children={({ route }) => {
               const params = route.params as NavigatorRouteParams;
               return (
                 <NavigatorPage completer={params?.completer}>
-                  {params?.view ?? children}
+                  {params?.children ?? children}
                 </NavigatorPage>
               );
             }}
           />
         </Stack.Navigator>
-      </NavigatorContext.Provider>
-    </NavigationContainer>
+      </NavigationContainer>
+    </NavigatorContext.Provider>
   );
 };
 
-const NavigatorPage = ({
+const NavigatorPage: FC<NavigatorRouteParams> = ({
   children,
   completer,
-}: {
-  children: ReactNode;
-  completer?: () => void;
 }) => {
   useEffect(() => completer, []);
   return <>{children}</>;
 };
 
 export function useNavigator(): NavigatorActions | null {
-  try {
-    return useContext(NavigatorContext)!;
-  } catch {
-    return null;
-  }
+  return useContext(NavigatorContext) ?? null;
 }
 
 //warning ignores
@@ -132,9 +103,14 @@ const nestedError =
   "Found screens with the same name nested inside one another. Check:";
 const nonSerializable =
   "Non-serializable values were found in the navigation state. Check:";
+const noParentNavigator = "The 'navigation' object hasn't been initialized yet.";
 
 //may cause errors...
-// LogBox.ignoreLogs([nestedError, nonSerializable]);
+export const hideNavigatorLogs = () => LogBox.ignoreLogs([
+  nestedError,
+  nonSerializable,
+  noParentNavigator
+]);
 
 const originalConsoleWarn = console.warn;
 console.warn = (...args: (string | string[])[]) => {
