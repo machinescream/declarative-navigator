@@ -19,6 +19,8 @@ export interface NavigatorActions {
   push: <T>(children: ReactNode) => Promise<T | undefined>;
   pop: <T>(result?: T) => void;
   replace: <T>(children: ReactNode) => Promise<T | undefined>;
+  parent: NavigatorActions | undefined;
+  canGoBack: () => boolean;
 }
 
 interface NavigatorRouteParams {
@@ -33,7 +35,10 @@ interface NavigatorProps {
 
 const NavigatorContext = createContext<NavigatorActions | undefined>(undefined);
 
-export const Navigator: FC<NavigatorProps> = ({ children, options }) => {
+export const Navigator: FC<NavigatorProps> = ({
+  children, options
+}) => {
+  const parent = useNavigator();
   const ref = useNavigationContainerRef();
 
   const push = async <T,>(children: ReactNode): Promise<T | undefined> => {
@@ -65,10 +70,23 @@ export const Navigator: FC<NavigatorProps> = ({ children, options }) => {
   };
 
   const Stack = createNativeStackNavigator();
+  const actions = {
+    push,
+    replace,
+    pop,
+    parent,
+    canGoBack: () => ref.isReady() ? ref.canGoBack() : false,
+  };
   return (
-    <NavigatorContext.Provider value={{ push, replace, pop }}>
-      <NavigationContainer independent={true} ref={ref}>
-        <Stack.Navigator screenOptions={options} initialRouteName={navigationPage}>
+    <NavigatorContext.Provider value={actions}>
+      <NavigationContainer
+        ref={ref}
+        independent={true}
+      >
+        <Stack.Navigator
+          screenOptions={options}
+          initialRouteName={navigationPage}
+        >
           <Stack.Screen
             name={navigationPage}
             children={({ route }) => {
@@ -94,8 +112,8 @@ const NavigatorPage: FC<NavigatorRouteParams> = ({
   return <>{children}</>;
 };
 
-export function useNavigator(): NavigatorActions | null {
-  return useContext(NavigatorContext) ?? null;
+export function useNavigator(): NavigatorActions | undefined {
+  return useContext(NavigatorContext) ?? undefined;
 }
 
 //warning ignores
