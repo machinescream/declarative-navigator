@@ -11,14 +11,15 @@ import React, {
   useContext,
   useEffect,
 } from "react";
-import { LogBox, } from "react-native";
+import { LogBox, Platform, } from "react-native";
 
 const navigationPage = "NavigationPage";
+const navigationPageModal = "NavigationPageModal";
 
 export interface NavigatorActions {
-  push: <T>(children: ReactNode) => Promise<T | undefined>;
+  push: <T>(children: ReactNode, modal?: boolean) => Promise<T | undefined>;
   pop: <T>(result?: T) => void;
-  replace: <T>(children: ReactNode) => Promise<T | undefined>;
+  replace: <T>(children: ReactNode, modal?: boolean) => Promise<T | undefined>;
   parent: NavigatorActions | undefined;
   canGoBack: () => boolean;
 }
@@ -41,10 +42,10 @@ export const Navigator: FC<NavigatorProps> = ({
   const parent = useNavigator();
   const ref = useNavigationContainerRef();
 
-  const push = async <T,>(children: ReactNode): Promise<T | undefined> => {
+  const push = async <T,>(children: ReactNode, modal?: boolean): Promise<T | undefined> => {
     return new Promise<T | undefined>((resolve, _) => {
       ref.dispatch(
-        StackActions.push(navigationPage, {
+        StackActions.push(modal ? navigationPageModal : navigationPage, {
           children: children,
           completer: resolve,
         }),
@@ -52,10 +53,10 @@ export const Navigator: FC<NavigatorProps> = ({
     });
   };
 
-  const replace = async <T,>(children: ReactNode): Promise<T | undefined> => {
+  const replace = async <T,>(children: ReactNode, modal?: boolean): Promise<T | undefined> => {
     return new Promise<T | undefined>((resolve, _) => {
       ref.dispatch(
-        StackActions.replace(navigationPage, {
+        StackActions.replace(modal ? navigationPageModal : navigationPage, {
           children: children,
           completer: resolve,
         }),
@@ -89,6 +90,20 @@ export const Navigator: FC<NavigatorProps> = ({
         >
           <Stack.Screen
             name={navigationPage}
+            children={({ route }) => {
+              const params = route.params as NavigatorRouteParams;
+              return (
+                <NavigatorPage completer={params?.completer}>
+                  {params?.children ?? children}
+                </NavigatorPage>
+              );
+            }}
+          />
+          <Stack.Screen
+            name={navigationPage}
+            options={{
+              presentation: Platform.OS == "web" ? "transparentModal" : "modal"
+            }}
             children={({ route }) => {
               const params = route.params as NavigatorRouteParams;
               return (
