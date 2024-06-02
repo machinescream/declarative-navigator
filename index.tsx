@@ -100,7 +100,7 @@ export const Navigator: FC<NavigatorProps> = ({
             }}
           />
           <Stack.Screen
-            name={navigationPage}
+            name={navigationPageModal}
             options={{
               presentation: Platform.OS == "web" ? "transparentModal" : "modal"
             }}

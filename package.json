@@ -1,6 +1,6 @@
 {
   "name": "declarative-navigator",
-  "version": "2.5.1",
+  "version": "2.5.2",
   "description": "Declarative navigation with static analysis safety",
   "main": "index.tsx",
   "scripts": {
